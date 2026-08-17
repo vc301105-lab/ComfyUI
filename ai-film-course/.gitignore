@@ -1,0 +1,3 @@
+# build scratch + regenerable synthesized audio (bootstrap.sh rebuilds them)
+demo-film/tmp/
+demo-film/audio/*.wav

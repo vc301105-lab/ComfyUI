@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+# ============================================================
+#  THE LAST LIGHTHOUSE — film assembler (Stage 6 of the course)
+#
+#  Route A "Storyboard Film": key frames + Ken Burns moves +
+#  crossfades + titles + AI narration + synthesized sound design
+#  ->  film.mp4
+#
+#  Two-stage architecture (keeps xfade and overlay graphs
+#  separate — they can destabilize each other's format
+#  negotiation):
+#    Stage A: 8 Ken Burns clips -> crossfades via padded
+#             overlay chain + fades (pure yuv420p)
+#    Stage B: overlays (pre-rendered RGBA clips) + narration
+#             + ambience bed + score (auto-detected)
+#
+#  Every knob is documented in storyboard.md / GUIDE Stage 6.
+#  Re-run anytime:  ./build_film.sh
+# ============================================================
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# ---- locate ffmpeg (system, or the imageio-ffmpeg static binary) ----
+FF=""
+if command -v ffmpeg >/dev/null 2>&1; then
+  FF=$(command -v ffmpeg)
+else
+  FF=$(python3 - <<'EOF'
+try:
+    import imageio_ffmpeg
+    print(imageio_ffmpeg.get_ffmpeg_exe())
+except Exception:
+    raise SystemExit(1)
+EOF
+)
+fi
+[ -n "$FF" ] || { echo "ERROR: ffmpeg not found. Try: pip install imageio-ffmpeg"; exit 1; }
+echo "==> using ffmpeg: $FF"
+
+FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+FILTER_LIST=$("$FF" -hide_banner -filters 2>/dev/null)
+HAVE_DRAWTEXT=0; [[ " $FILTER_LIST " == *" drawtext "* ]] && HAVE_DRAWTEXT=1
+HAVE_OVERLAY=0;  [[ " $FILTER_LIST " == *" overlay "* ]]  && HAVE_OVERLAY=1
+
+FRAMES=(shot-01 shot-02 shot-03 shot-04 shot-05 shot-06 shot-07 shot-08)
+WEIGHTS=(9 8 7 8 9 8 8 9)          # relative durations (script.md shot list)
+XF=0.6                              # crossfade length
+LEAD=2.5                            # silence before VO
+TAIL=4.5                            # after VO (credits)
+FPS=24
+mkdir -p tmp
+
+# ---- narration duration ----
+NDUR=$("$FF" -hide_banner -i audio/narration.mp3 -f null - 2>&1 \
+        | grep -oE 'Duration: [0-9:.]+' | head -1 | awk '{print $2}')
+N=$(echo "$NDUR" | awk -F: '{print $1*3600+$2*60+$3}')
+TOTAL=$(awk -v l=$LEAD -v n=$N -v t=$TAIL 'BEGIN{printf "%.3f", l+n+t}')
+echo "==> narration ${N}s -> film target ${TOTAL}s"
+
+# ---- per-shot durations: scale the storyboard weights to the timeline ----
+awk -v total=$TOTAL -v xf=$XF -v w="${WEIGHTS[*]}" 'BEGIN{
+  split(w,ws," "); s=0; for(i in ws) s+=ws[i];
+  k=(total+7*xf)/s; for(i=1;i<=8;i++) printf "%.4f\n", ws[i]*k
+}' > tmp/durs.txt
+mapfile -t DURS < tmp/durs.txt
+
+# ---- 1) render each key frame as a Ken Burns clip ----
+#   cover-crop to 1920x1080 -> overscan headroom -> slow zoom (alt. push/pull)
+#   encoded at 1920x1088 (mod-16): H.264 pads 1080 to 1088 internally and the
+#   decoder re-reports the size mid-stream, which can destabilize multi-input
+#   filtergraphs. Coding at 1088 removes the change event (cropped in stage A).
+for i in $(seq 0 7); do
+  f=${FRAMES[$i]}; d=${DURS[$i]}
+  F=$(awk -v d=$d -v fps=$FPS 'BEGIN{printf "%d", d*fps+0.5}')
+  DURS[$i]=$(awk -v F=$F -v fps=$FPS 'BEGIN{printf "%.4f", F/fps}')
+  if (( i % 2 == 0 )); then Z="1+0.25*on/($F-1)"; else Z="1.25-0.25*on/($F-1)"; fi
+  VF="scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,scale=2400:1350:flags=lanczos,zoompan=z='${Z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${F}:s=1920x1080:fps=${FPS},pad=1920:1088:0:0,format=yuv420p"
+  echo "==> clip $((i+1)) ${f}  (${DURS[$i]}s, ${F} frames)"
+  "$FF" -y -hide_banner -loglevel error -loop 1 -i "frames/${f}.png" \
+        -vf "$VF" -frames:v "$F" -r $FPS \
+        -c:v libx264 -preset medium -crf 18 "tmp/clip-$i.mp4"
+done
+printf '%s\n' "${DURS[@]}" > tmp/durs.txt
+
+# ---- 2) crossfade offsets from the rounded clip durations ----
+OFFSETS=($(awk -v xf=$XF '{ d[NR]=$1 } END {
+  o=0; for(i=1;i<NR;i++){ o+=d[i]-xf; printf "%.3f ", o }
+}' tmp/durs.txt))
+
+# ---- 3) title / credit overlays ----
+TITLE_MODE="none"
+if [ "$HAVE_DRAWTEXT" = "1" ] && [ -f "$FONT" ]; then TITLE_MODE="drawtext"
+elif [ "$HAVE_OVERLAY" = "1" ] && python3 -c "import PIL" 2>/dev/null; then TITLE_MODE="png"
+fi
+case "$TITLE_MODE" in
+  png)
+    python3 - "$FONT" <<'EOF'
+import sys
+from PIL import Image, ImageDraw, ImageFont
+font_path = sys.argv[1]
+
+def draw_tracked(draw, xy, text, font, tracking):
+    x, y = xy
+    for ch in text:
+        draw.text((x, y), ch, font=font, fill=(255, 255, 255, 255))
+        x += font.getbbox(ch)[2] + tracking
+
+def text_png(text, size, tracking, path):
+    img = Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype(font_path, size)
+    widths = [font.getbbox(ch)[2] + tracking for ch in text]
+    total_w = sum(widths) - tracking
+    y = 540 - size
+    draw_tracked(draw, ((1920 - total_w) // 2, y), text, font, tracking)
+    img.save(path)
+
+text_png("THE LAST LIGHTHOUSE", 92, 14, "tmp/title.png")
+text_png("WRITTEN, DIRECTED & GENERATED BY YOU", 38, 6, "tmp/credits.png")
+print("PIL title PNGs rendered")
+EOF
+    # pre-render the overlays as REAL video clips (RGBA .mov) with fades baked
+    # in. Looped PNG inputs can change parameters mid-stream; clips cannot.
+    "$FF" -y -hide_banner -loglevel error -f image2 -r 24 -loop 1 -i tmp/title.png \
+      -vf "format=rgba,setsar=1,fade=t=in:st=0:d=0.8:alpha=1,fade=t=out:st=3.7:d=0.8:alpha=1" \
+      -t 5.5 -r 24 -c:v qtrle tmp/title.mov
+    "$FF" -y -hide_banner -loglevel error -f image2 -r 24 -loop 1 -i tmp/credits.png \
+      -vf "format=rgba,setsar=1,fade=t=in:st=0:d=0.8:alpha=1,fade=t=out:st=2.0:d=0.8:alpha=1" \
+      -t 3.6 -r 24 -c:v qtrle tmp/credits.mov
+    ;;
+esac
+
+# ============================================================
+#  STAGE A — crossfade assembly via padded overlay chain
+#
+#  Every clip is padded with TRANSPARENT frames (tpad) to the
+#  full timeline length, so no stream ever ends early; each
+#  incoming shot fades its alpha in over the accumulated
+#  picture. Visually identical to xfade=fade, and it survives
+#  the filtergraph-reinit race that breaks the xfade filter on
+#  multi-input graphs.
+# ============================================================
+FADE_OUT=$(awk -v t=$TOTAL 'BEGIN{printf "%.3f", t-1.0}')
+FILT=tmp/filterA.txt; : > "$FILT"
+for i in $(seq 0 7); do
+  O=0; [ "$i" -gt 0 ] && O=${OFFSETS[$((i-1))]}
+  D=${DURS[$i]}
+  S=$(awk -v t=$TOTAL -v o=$O -v d=$D 'BEGIN{printf "%.3f", t-o-d}')
+  CHAIN="[$i:v]crop=1920:1080:0:0,fps=24,format=yuva420p"
+  if [ "$i" -gt 0 ]; then CHAIN="$CHAIN,fade=t=in:st=0:d=${XF}:alpha=1"; fi
+  CHAIN="$CHAIN,tpad=start_duration=${O}:stop_duration=${S}:color=black@0[c$i];"
+  echo "$CHAIN" >> "$FILT"
+  if [ "$i" -gt 0 ]; then
+    PREV="o$((i-1))"; [ "$i" -eq 1 ] && PREV="c0"
+    echo "[$PREV][c$i]overlay=0:0:format=yuv420[o$i];" >> "$FILT"
+  fi
+done
+echo "[o7]fade=t=in:st=0:d=0.8,fade=t=out:st=${FADE_OUT}:d=1.0[vout];" >> "$FILT"
+
+echo "==> STAGE A: crossfade chain"
+"$FF" -y -hide_banner -loglevel error \
+  -reinit_filter 0 -i tmp/clip-0.mp4 -reinit_filter 0 -i tmp/clip-1.mp4 \
+  -reinit_filter 0 -i tmp/clip-2.mp4 -reinit_filter 0 -i tmp/clip-3.mp4 \
+  -reinit_filter 0 -i tmp/clip-4.mp4 -reinit_filter 0 -i tmp/clip-5.mp4 \
+  -reinit_filter 0 -i tmp/clip-6.mp4 -reinit_filter 0 -i tmp/clip-7.mp4 \
+  -filter_complex_script "$FILT" -map "[vout]" \
+  -c:v libx264 -preset medium -crf 16 -pix_fmt yuv420p -r $FPS \
+  -t "$TOTAL" \
+  tmp/video-a.mp4
+
+# ============================================================
+#  STAGE B — overlays + narration + sound design + final encode
+# ============================================================
+# clean PCM WAV for the narration (VBR mp3 streams can also change
+# parameters mid-decode)
+"$FF" -y -hide_banner -loglevel error -i audio/narration.mp3 -ar 48000 -c:a pcm_s16le tmp/narration.wav
+
+CRED_IN=$(awk -v t=$TOTAL 'BEGIN{printf "%.3f", t-4.0}')
+FILTB=tmp/filterB.txt; : > "$FILTB"
+case "$TITLE_MODE" in
+  png)
+    echo "[0:v]format=yuv420p[vm];" >> "$FILTB"
+    echo "[1:v]format=rgba,setpts=PTS-STARTPTS+1.0/TB[ti];" >> "$FILTB"
+    echo "[vm][ti]overlay=0:0:format=yuv420[o1];" >> "$FILTB"
+    echo "[o1]format=yuv420p[vm2];" >> "$FILTB"
+    echo "[2:v]format=rgba,setpts=PTS-STARTPTS+${CRED_IN}/TB[cr];" >> "$FILTB"
+    echo "[vm2][cr]overlay=0:0:format=yuv420[vout];" >> "$FILTB"
+    ;;
+  drawtext)
+    echo "[0:v]drawtext=fontfile=${FONT}:text='THE LAST LIGHTHOUSE':fontsize=92:fontcolor=white:borderw=3:bordercolor=black@0.55:x=(w-text_w)/2:y=(h-text_h)/2-60:alpha='if(lt(t,1.0),0,if(lt(t,1.8),(t-1.0)/0.8,if(lt(t,4.7),1,if(lt(t,5.5),(5.5-t)/0.8,0))))'[t1];" >> "$FILTB"
+    echo "[t1]drawtext=fontfile=${FONT}:text='WRITTEN, DIRECTED & GENERATED BY YOU':fontsize=38:fontcolor=white:borderw=2:bordercolor=black@0.55:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(lt(t,${CRED_IN}),0,if(lt(t,${CRED_IN}+0.8),(t-${CRED_IN})/0.8,if(lt(t,${CRED_IN}+2.0),1,if(lt(t,${CRED_IN}+2.8),(${CRED_IN}+2.8-t)/0.8,0))))'[t2];" >> "$FILTB"
+    echo "[t2]format=yuv420p[vout];" >> "$FILTB"
+    ;;
+  *)
+    echo "[0:v]format=yuv420p[vout];" >> "$FILTB"
+    ;;
+esac
+
+# audio: delay VO by LEAD, loudness-normalize to -14 LUFS, gentle fades
+AFOUT=$(awk -v l=$LEAD -v n=$N 'BEGIN{printf "%.3f", l+n-1.2}')
+ADELAY=$(awk -v l=$LEAD 'BEGIN{printf "%.0f", l*1000}')
+AIDX=1; [ "$TITLE_MODE" = "png" ] && AIDX=3
+echo "[${AIDX}:a]adelay=delays=${ADELAY}:all=1,loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=in:st=0:d=0.5,afade=t=out:st=${AFOUT}:d=1.2,aformat=channel_layouts=stereo[vo];" >> "$FILTB"
+
+# optional procedural beds: ambience (audio/ambience.wav, ~18 dB under the VO)
+# and score (audio/music.wav, ~25 dB under). Both synthesized in code —
+# see audio/make_ambience.py and audio/make_music.py.
+AMBFADE=$(awk -v t=$TOTAL 'BEGIN{printf "%.3f", t-3.0}')
+BIDX=$((AIDX+1))
+MIDX=$BIDX; [ -f audio/ambience.wav ] && MIDX=$((BIDX+1))
+MIXPARTS="[vo]"; MIXIN=1
+if [ -f audio/ambience.wav ]; then
+  echo "[${BIDX}:a]afade=t=in:st=0:d=1.5,afade=t=out:st=${AMBFADE}:d=3.0,aformat=channel_layouts=stereo[bed];" >> "$FILTB"
+  MIXPARTS="${MIXPARTS}[bed]"; MIXIN=$((MIXIN+1))
+fi
+if [ -f audio/music.wav ]; then
+  echo "[${MIDX}:a]afade=t=in:st=0:d=2.0,afade=t=out:st=${AMBFADE}:d=3.0,aformat=channel_layouts=stereo[mus];" >> "$FILTB"
+  MIXPARTS="${MIXPARTS}[mus]"; MIXIN=$((MIXIN+1))
+fi
+if [ "$MIXIN" -gt 1 ]; then
+  echo "${MIXPARTS}amix=inputs=${MIXIN}:duration=longest:dropout_transition=0:normalize=0[aout];" >> "$FILTB"
+else
+  echo "[vo]anull[aout];" >> "$FILTB"
+fi
+
+echo "==> STAGE B: overlays + narration"
+INPUTS=(-reinit_filter 0 -i tmp/video-a.mp4)
+[ "$TITLE_MODE" = "png" ] && INPUTS+=(-reinit_filter 0 -i tmp/title.mov -reinit_filter 0 -i tmp/credits.mov)
+INPUTS+=(-reinit_filter 0 -i tmp/narration.wav)
+[ -f audio/ambience.wav ] && INPUTS+=(-reinit_filter 0 -i audio/ambience.wav)
+[ -f audio/music.wav ] && INPUTS+=(-reinit_filter 0 -i audio/music.wav)
+
+"$FF" -y -hide_banner -loglevel error \
+  "${INPUTS[@]}" \
+  -filter_complex_script "$FILTB" \
+  -map "[vout]" -map "[aout]" \
+  -c:v libx264 -preset medium -crf 19 -pix_fmt yuv420p -r $FPS \
+  -c:a aac -b:a 192k -ar 48000 -movflags +faststart \
+  -t "$TOTAL" \
+  film.mp4
+
+# ---- 6) report ----
+"$FF" -hide_banner -i film.mp4 2>&1 | grep -E 'Duration|Stream' | head -3
+ls -lh film.mp4 | awk '{print "==> written:", $9, $5}'
+echo "==> DONE. Watch film.mp4 — or upload the frames to a video model (see storyboard.md motion column) to upgrade to a full motion film."
