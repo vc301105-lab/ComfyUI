@@ -1,0 +1,26 @@
+{
+  "_comment": "Model manifest. repo = HuggingFace repo (confirm karein). tier: core (video) | optional (image/consistency) | audio (TTS/music). verify=true = repo id apni machine pe ek baar check kar lena.",
+  "core": [
+    {"name": "Wan 2.2 T2V 5B", "repo": "Wan-AI/Wan2.2-T2V-5B", "local_dir": "models/diffusion_models/Wan2.2-T2V-5B", "size_gb": 20, "license": "Apache-2.0", "tier": "core", "verify": true},
+    {"name": "Wan 2.2 I2V 14B 720P", "repo": "Wan-AI/Wan2.2-I2V-14B-720P", "local_dir": "models/diffusion_models/Wan2.2-I2V-14B-720P", "size_gb": 60, "license": "Apache-2.0", "tier": "core", "verify": true},
+    {"name": "Wan text encoder (UMT5)", "repo": "Wan-AI/Wan2.1-T2V-14B", "local_dir": "models/text_encoders/wan", "size_gb": 12, "license": "Apache-2.0", "tier": "core", "verify": true, "files": ["models_t5_umt5-xxl-enc-bf16.pth"]},
+    {"name": "Wan VAE", "repo": "Wan-AI/Wan2.1-T2V-14B", "local_dir": "models/vae/wan", "size_gb": 1, "license": "Apache-2.0", "tier": "core", "verify": true, "files": ["Wan2_1_VAE.pth"]},
+    {"name": "HunyuanVideo 1.5", "repo": "Tencent/HunyuanVideo-1.5", "local_dir": "models/diffusion_models/HunyuanVideo-1.5", "size_gb": 60, "license": "Tencent-license", "tier": "core", "verify": true},
+    {"name": "HunyuanVideo I2V", "repo": "Tencent/HunyuanVideo-I2V", "local_dir": "models/diffusion_models/HunyuanVideo-I2V", "size_gb": 60, "license": "Tencent-license", "tier": "core", "verify": true},
+    {"name": "Hunyuan text encoder (LLaVA)", "repo": "xtuner/llava-llama-3-8b-v1_1-transformers", "local_dir": "models/text_encoders/llava-llama-3-8b", "size_gb": 16, "license": "open", "tier": "core", "verify": false},
+    {"name": "Hunyuan VAE", "repo": "tencent/HunyuanVideo", "local_dir": "models/vae/hunyuan", "size_gb": 1, "license": "Tencent-license", "tier": "core", "verify": true, "files": ["hunyuan_video_vae_bf16.safetensors"]},
+    {"name": "CLIP ViT-L (video text encoder)", "repo": "openai/clip-vit-large-patch14", "local_dir": "models/clip_vision/clip-vit-large-patch14", "size_gb": 1, "license": "MIT", "tier": "core", "verify": false}
+  ],
+  "optional": [
+    {"name": "SDXL base", "repo": "stabilityai/stable-diffusion-xl-base-1.0", "local_dir": "models/checkpoints/sdxl-base-1.0", "size_gb": 7, "license": "OpenRAIL++-M", "tier": "optional", "verify": false},
+    {"name": "IP-Adapter SDXL", "repo": "h94/IP-Adapter", "local_dir": "models/controlnet/ipadapter", "size_gb": 3, "license": "Apache-2.0", "tier": "optional", "verify": false, "files": ["sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors", "sdxl_models/ip-adapter-plus-face_sdxl_vit-h.safetensors"]},
+    {"name": "IP-Adapter CLIP Vision", "repo": "h94/IP-Adapter", "local_dir": "models/clip_vision/ipadapter", "size_gb": 2, "license": "Apache-2.0", "tier": "optional", "verify": false, "files": ["models/image_encoder/model.safetensors"]},
+    {"name": "Qwen-Image", "repo": "Qwen/Qwen-Image", "local_dir": "models/diffusion_models/Qwen-Image", "size_gb": 40, "license": "Apache-2.0", "tier": "optional", "verify": true}
+  ],
+  "audio": [
+    {"name": "Chatterbox (TTS)", "repo": "ResembleAI/chatterbox", "local_dir": "models/tts/chatterbox", "size_gb": 9, "license": "MIT", "tier": "audio", "verify": true},
+    {"name": "Kokoro-82M (TTS, CPU)", "repo": "hexgrad/Kokoro-82M", "local_dir": "models/tts/kokoro", "size_gb": 1, "license": "Apache-2.0", "tier": "audio", "verify": false},
+    {"name": "ACE-Step (music)", "repo": "ace-step/ACE-Step", "local_dir": "models/audio/ace-step", "size_gb": 8, "license": "MIT", "tier": "audio", "verify": true},
+    {"name": "MusicGen (loops)", "repo": "facebook/musicgen-large", "local_dir": "models/audio/musicgen", "size_gb": 10, "license": "CC-BY-NC", "tier": "audio", "verify": true}
+  ]
+}

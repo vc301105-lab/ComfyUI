@@ -106,6 +106,53 @@ def cmd_post(args, cfg):
     print(f"POPCORN TIME 🍿 -> {out}")
 
 
+def cmd_qc(args, cfg):
+    import qcr  # noqa: E402
+    project = project_dir(cfg, args.project)
+    rep = qcr.review_project(project, expected_seconds=cfg.get("scene_seconds"))
+    text = qcr.report_text(rep)
+    print(text)
+    if args.json_out:
+        with open(args.json_out, "w", encoding="utf-8") as f:
+            json.dump(rep, f, indent=2, ensure_ascii=False)
+        print(f"[qc] report -> {args.json_out}")
+    if args.strict and (rep["summary"]["scenes_missing"] or "black_frames" in rep["summary"]["issues"]
+                        and rep["summary"]["issues"]["black_frames"]):
+        raise SystemExit("QC FAILED (--strict): fix issues phir dobara")
+
+
+def cmd_dub(args, cfg):
+    import dub  # noqa: E402
+    project = project_dir(cfg, args.project)
+    llm_obj = None
+    if not args.dry_run:
+        llm_obj = llm.LLM(cfg["ollama_url"], args.llm_model or cfg["llm_model"],
+                          cfg["llm_temperature"])
+    translations = None
+    if args.dry_run:
+        plan = load_plan(project)
+        if not plan:
+            raise SystemExit("plan.json nahi mila")
+        total = sum(len(sc.get("dialogue") or []) for sc in plan["scenes"])
+        print(f"[dub][dry] {total} lines translate hue gi -> {args.lang}")
+        return
+    plan = load_plan(project)
+    if not plan:
+        raise SystemExit("plan.json nahi mila")
+    trans = {}
+    tpath = os.path.join(project, "meta", f"dub_{args.lang}.json")
+    if os.path.exists(tpath):
+        with open(tpath, encoding="utf-8") as f:
+            trans = json.load(f)
+        print(f"[dub] using existing translations ({len(trans)})")
+    else:
+        trans = dub.translate_lines(cfg, plan, args.lang, llm_obj)
+        with open(tpath, "w", encoding="utf-8") as f:
+            json.dump(trans, f, indent=2, ensure_ascii=False)
+    out = dub.dub_project(cfg, project, target=args.lang, llm=None, translate=False)
+    print(f"DUB DONE -> {out}")
+
+
 def cmd_status(args, cfg):
     project = project_dir(cfg, args.project)
     plan = load_plan(project)
@@ -163,13 +210,25 @@ def main():
     sp.add_argument("--language", default=None)
     sp.add_argument("--no-loudness", action="store_true")
 
+    sp = sub.add_parser("qc", help="QC/review: scene checks + continuity report")
+    sp.add_argument("--project", default="myfilm")
+    sp.add_argument("--json-out", default=None)
+    sp.add_argument("--strict", action="store_true")
+
+    sp = sub.add_parser("dub", help="Multi-language dubbing (Ollama translate + TTS + remux)")
+    sp.add_argument("--project", default="myfilm")
+    sp.add_argument("--lang", default="en")
+    sp.add_argument("--llm-model", default=None)
+    sp.add_argument("--dry-run", action="store_true")
+
     sp = sub.add_parser("status", help="Project render progress")
     sp.add_argument("--project", default="myfilm")
 
     args = p.parse_args()
     cfg = config_mod.load_config(args.config)
     {"plan": cmd_plan, "cast": cmd_cast, "render": cmd_render,
-     "assemble": cmd_assemble, "post": cmd_post, "status": cmd_status}[args.cmd](args, cfg)
+     "assemble": cmd_assemble, "post": cmd_post, "qc": cmd_qc,
+     "dub": cmd_dub, "status": cmd_status}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

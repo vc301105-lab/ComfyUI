@@ -23,8 +23,11 @@ def _command(cfg):
     return None
 
 
-def build_scene_track(cfg, project, scene, force=False):
-    """Scene ke dialogues -> ek normalized WAV track (silence gaps ke saath)."""
+def build_scene_track(cfg, project, scene, force=False, out_name=None):
+    """Scene ke dialogues -> ek normalized WAV track (silence gaps ke saath).
+
+    out_name: default 'scene_XX_track' — dub me 'scene_XX_<lang>' pass hota hai.
+    """
     lines = scene.get("dialogue") or []
     if not lines:
         return None
@@ -40,13 +43,15 @@ def build_scene_track(cfg, project, scene, force=False):
     os.makedirs(audio_dir, exist_ok=True)
     sr = int(tts.get("sample_rate", 48000))
     pause = max(0.0, float(tts.get("pause", 0.4)))
+    stem = out_name or f"scene_{int(scene['id']):02d}_track"
 
-    track = os.path.join(audio_dir, f"scene_{int(scene['id']):02d}_track.wav")
-    parts = [media.make_silence(os.path.join(audio_dir, "lead.wav"), 0.25, sr)]
+    track = os.path.join(audio_dir, f"{stem}.wav")
+    if os.path.exists(track) and not force:
+        return track
+    parts = [media.make_silence(os.path.join(audio_dir, f"{stem}_lead.wav"), 0.25, sr)]
 
     for i, d in enumerate(lines):
-        raw = os.path.join(audio_dir,
-                           f"scene_{int(scene['id']):02d}_line{i:02d}.wav")
+        raw = os.path.join(audio_dir, f"{stem}_line{i:02d}.wav")
         norm = raw.replace(".wav", "_norm.wav")
         if not os.path.exists(raw) or force:
             cmd_t = cmd.replace("%TEXT%", str(d.get("line", ""))) \
@@ -58,7 +63,7 @@ def build_scene_track(cfg, project, scene, force=False):
             media.normalize_audio(raw, norm, sr)
             parts.append(norm)
             parts.append(media.make_silence(
-                os.path.join(audio_dir, f"gap{i}.wav"), pause, sr))
+                os.path.join(audio_dir, f"{stem}_gap{i}.wav"), pause, sr))
         else:
             print(f"[tts] S{scene['id']} L{i}: output nahi bana — skip")
     media.concat_audio(parts, track)

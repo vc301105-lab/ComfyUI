@@ -25,8 +25,11 @@ bash ai_film_studio/setup/02_install_custom_nodes.sh
 # Step 3 — Verify setup (imports + custom nodes load)
 bash ai_film_studio/setup/03_verify_setup.sh
 
-# Step 4 — Models download (exact commands, docs me)
-cat ai_film_studio/docs/model-downloads.md
+# Step 4 — Models download (license-aware, disk-check wala)
+python3 ai_film_studio/setup/04_download_models.py --tier core   # video engines
+python3 ai_film_studio/setup/04_download_models.py --tier optional
+python3 ai_film_studio/setup/04_download_models.py --tier audio
+# (manual HF commands bhi docs me: docs/model-downloads.md)
 
 # Step 5 — ComfyUI start
 .venv/bin/python main.py --listen 0.0.0.0
@@ -142,7 +145,14 @@ python3 director.py assemble
 python3 director.py post --tts chatterbox --lipsync latentsync \
                          --music acestep --subtitles --language hi
 
-# 6) Progress
+# 6) QC/review (scene quality + continuity report)
+python3 director.py qc --json-out qc_report.json
+
+# 7) Multi-language dubbing (Ollama translate -> TTS -> final_en.mp4)
+python3 director.py dub --lang en --dry-run    # kitni lines translate hongi
+python3 director.py dub --lang en
+
+# 8) Progress
 python3 director.py status
 ```
 
@@ -169,8 +179,14 @@ cd ai_film_studio/director_agent
 python3 tests/test_post.py          # SRT + command templates
 python3 tests/test_converter.py     # 5 workflows UI->API conversion
 python3 tests/test_templates.py     # SDXL/IP-Adapter/Qwen templates
+python3 tests/test_qc_dub.py        # QC checks (black/cuts/PSNR) + dub translate
 python3 tests/test_e2e.py           # mock ComfyUI se plan->render->assemble (multi-GPU)
 ```
+
+### 📥 Model downloader (`setup/04_download_models.py`)
+- Manifest: `setup/models.json` (17 models, ~311GB, licenses ke saath)
+- `--tier core|optional|audio|all` • `--name "Wan"` filter • `--dry-run` plan
+- Disk-space check + `[VERIFY repo id!]` wale repos pe warning
 
 State har scene ka `meta/state.json` me save hota hai — **resumable**: koi scene
 fail ho toh sirf wahi scene dobara render hota hai.
