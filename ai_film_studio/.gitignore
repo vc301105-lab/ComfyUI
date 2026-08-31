@@ -1,0 +1,6 @@
+# generated film projects (renders, keyframes, scenes) — repo me nahi
+projects/
+director_agent/config.json
+*.mp4
+*.wav
+*.srt

@@ -88,6 +88,60 @@ Step-by-step: [`docs/production-workflow.md`](docs/production-workflow.md)
 
 ---
 
+## 🎬 Director Agent (Script → Scenes → Render → Final MP4)
+
+`director_agent/` me ek **pure-Python CLI** hai (sirf Python 3 stdlib — koi extra
+dependency nahi). Ye aapka mini production studio automate karta hai:
+
+```
+director_agent/
+├── director.py            # CLI entry point
+├── config.json.example    # config template (copy -> config.json)
+├── manifest.json          # Har workflow ke prompt/image/output nodes ka map
+├── comfy.py               # ComfyUI API client: UI->API convert, upload, queue, download
+├── planner.py             # Idea -> script (Hinglish) via Ollama (--mock demo bhi)
+├── storyboard.py          # Scene -> keyframe image prompts
+├── renderer.py            # Keyframes + scene videos render (resumable state)
+├── assembler.py           # ffmpeg concat -> final.mp4 (+audio/subtitles)
+├── tts.py                 # Optional voice (chatterbox/custom)
+├── prompts/               # LLM system prompts (01_plan, 02_storyboard)
+└── tests/test_converter.py# Workflow converter contract tests (pass ✓)
+
+workflows/                  # Official example workflows (verified node maps):
+├── wan21_14b_t2v_example.json      # Wan 2.1 14B T2V
+├── wan22_5b_i2v_example.json       # Wan 2.2 5B TI2V (default engine)
+├── hyvideo_t2v_example.json        # HunyuanVideo 1.5 T2V
+├── hyvideo_i2v_example.json        # HunyuanVideo 1.5 I2V
+└── ltx23_t2v_i2v_example.json      # LTX-2.3 (Gemma API chahiye, advanced)
+```
+
+### Usage
+
+```bash
+cd ai_film_studio/director_agent
+cp config.json.example config.json        # apne paths/models set karein
+
+# 1) Idea -> Hinglish script + storyboard (Ollama chahiye; --mock se bina Ollama demo)
+python3 director.py plan --idea "Ek chai ki tapri ka sapna" --scenes 8 [--mock]
+
+# 2) Preview (koi network call nahi)
+python3 director.py render --dry-run
+
+# 3) Real render (ComfyUI chal raha ho + models downloaded)
+python3 director.py render [--scene 1,2,3] [--workflow wan22_5b_i2v_example.json]
+
+# 4) Final film
+python3 director.py assemble [--with-audio] [--subtitles]
+
+# 5) Progress
+python3 director.py status
+```
+
+State har scene ka `meta/state.json` me save hota hai — **resumable**: koi scene
+fail ho toh sirf wahi scene dobara render hota hai.
+
+---
+
 ## ⚠️ Important Notes
 
 - **Disk:** Models total ~400GB–1TB. 2TB NVMe recommended.

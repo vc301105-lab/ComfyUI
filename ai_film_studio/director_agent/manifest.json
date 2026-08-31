@@ -1,0 +1,54 @@
+{
+  "_comment": "Manifest: har workflow file ke andar kis node/widget ko replace karna hai. node ids UI-format JSON se hain.",
+  "wan21_14b_t2v_example.json": {
+    "label": "Wan 2.1 14B T2V (KJ wrapper)",
+    "type": "t2v",
+    "vram_tier": "24GB+",
+    "positive": { "node": "16", "widget": 0 },
+    "negative": { "node": "16", "widget": 1 },
+    "image": null,
+    "output": { "node": "30", "widget": 0, "field": "filename_prefix" },
+    "default_prefix": "WanVideo2_1_T2V"
+  },
+  "wan22_5b_i2v_example.json": {
+    "label": "Wan 2.2 5B TI2V (KJ wrapper)",
+    "type": "i2v",
+    "vram_tier": "16GB+",
+    "positive": { "node": "16", "widget": 0 },
+    "negative": { "node": "16", "widget": 1 },
+    "image": { "node": "58", "widget": 0 },
+    "output": { "node": "92", "widget": 0, "field": "filename_prefix" },
+    "default_prefix": "WanVideoWrapper_5BI2V"
+  },
+  "hyvideo_t2v_example.json": {
+    "label": "HunyuanVideo 1.5 T2V (KJ wrapper)",
+    "type": "t2v",
+    "vram_tier": "24GB+",
+    "positive": { "node": "30", "widget": 0 },
+    "negative": { "node": "30", "widget": 1 },
+    "image": null,
+    "output": { "node": "34", "widget": 0, "field": "filename_prefix" },
+    "default_prefix": "HunyuanVideo"
+  },
+  "hyvideo_i2v_example.json": {
+    "label": "HunyuanVideo 1.5 I2V (KJ wrapper)",
+    "type": "i2v",
+    "vram_tier": "24GB+",
+    "positive": { "node": "77", "widget": 0 },
+    "negative": null,
+    "image": { "node": "72", "widget": 0 },
+    "output": { "node": "84", "widget": 0, "field": "filename_prefix" },
+    "default_prefix": "HunyuanVideoWrapper_I2V"
+  },
+  "ltx23_t2v_i2v_example.json": {
+    "label": "LTX-2.3 T2V/I2V (official, advanced)",
+    "type": "i2v",
+    "vram_tier": "24GB+",
+    "requires_gemma_api": true,
+    "positive": { "node": "2483", "widget": 0 },
+    "negative": { "node": "2612", "widget": 0 },
+    "image": { "node": "2004", "widget": 0 },
+    "output": { "node": "4823", "widget": 0, "field": null },
+    "default_prefix": "output_F"
+  }
+}
