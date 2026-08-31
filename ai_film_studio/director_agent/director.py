@@ -17,6 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import config as config_mod
+import comfy  # noqa: E402
 import llm  # noqa: E402
 import planner  # noqa: E402
 import storyboard  # noqa: E402
@@ -56,7 +57,23 @@ def cmd_render(args, cfg):
     renderer.render_project(cfg, project, wf_name=args.workflow or cfg["video_workflow"],
                             scenes=args.scene.split(",") if args.scene else None,
                             dry_run=args.dry_run,
-                            make_keyframes=not args.no_keyframes)
+                            make_keyframes=not args.no_keyframes,
+                            parallel=args.parallel,
+                            keyframe_identity=args.identity)
+
+
+def cmd_cast(args, cfg):
+    project = project_dir(cfg, args.project)
+    plan = load_plan(project)
+    if not plan:
+        raise SystemExit("plan.json nahi mila — pehle: director.py plan ...")
+    if dry := args.dry_run:
+        print(f"[cast][dry] {len(plan.get('characters', []))} characters")
+        renderer.cast_characters(cfg, None, project, plan, dry_run=True)
+        return
+    client = comfy.ComfyClient(cfg["comfy_url"])
+    renderer.cast_characters(cfg, client, project, plan, dry_run=False)
+    print("Next: director.py render --identity")
 
 
 def cmd_assemble(args, cfg):
@@ -111,6 +128,14 @@ def main():
     sp.add_argument("--scene", default=None)
     sp.add_argument("--dry-run", action="store_true")
     sp.add_argument("--no-keyframes", action="store_true")
+    sp.add_argument("--parallel", type=int, default=1,
+                    help="Multi-GPU: kitne ComfyUI workers pe parallel render")
+    sp.add_argument("--identity", action="store_true",
+                    help="Character reference + IP-Adapter consistency (pehle 'cast' chalein)")
+
+    sp = sub.add_parser("cast", help="Plan ke characters ke reference images banao")
+    sp.add_argument("--project", default="myfilm")
+    sp.add_argument("--dry-run", action="store_true")
 
     sp = sub.add_parser("assemble", help="Scene videos -> final.mp4 (ffmpeg)")
     sp.add_argument("--project", default="myfilm")
@@ -122,8 +147,8 @@ def main():
 
     args = p.parse_args()
     cfg = config_mod.load_config(args.config)
-    {"plan": cmd_plan, "render": cmd_render, "assemble": cmd_assemble,
-     "status": cmd_status}[args.cmd](args, cfg)
+    {"plan": cmd_plan, "cast": cmd_cast, "render": cmd_render,
+     "assemble": cmd_assemble, "status": cmd_status}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

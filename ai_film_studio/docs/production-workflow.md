@@ -13,10 +13,13 @@ QC hi difference banata hai.
 - Tip: dialogues ko `[HINGLISH]` tone me likhwao: "Arre bhai, sun na…"
 - **QC:** 1 min read yourself — plot holes fix karo
 
-## Stage 2 — Character Bible
-**Tools:** Qwen-Image (text in image) / FLUX.2 klein + IP-Adapter
-- Har main character ke liye: `character_<name>_ref.png` (front + 3/4 angle)
-- Appearance notes (hair/clothes/age) `characters.yaml`
+## Stage 2 — Character Bible (AUTOMATED: director.py cast)
+**Tools:** SDXL (cast) + IP-Adapter (scenes) + Qwen-Image/FLUX (variants)
+- `python3 director.py cast` — plan ke har character ke liye reference image
+  banta hai (`project/characters/NAME.png`) — appearance prompt se
+- Har main character ke liye: front + 3/4 angle reference
+- Scene render me `--identity` → ye reference image IP-Adapter ke through
+  har keyframe me inject hoti hai = **same face har scene me**
 - **QC:** Har reference me same features — nahi toh regenerate
 
 ## Stage 3 — Storyboard (15–25 Keyframes)
@@ -28,8 +31,10 @@ QC hi difference banata hai.
 ## Stage 4 — Scene Video Generation
 **Tool:** HunyuanVideo 1.5 (text) / Wan 2.2 I2V-14B (from keyframe)
 - Har scene 5–10s, 720p/1080p, 24–30fps
-- Character consistency ke liye IP-Adapter + reference image feed
-- Multi-GPU: LTX-2.3 aur Hunyuan alag cards pe parallel
+- `director.py render --identity --parallel N`
+  - `--identity`: keyframe IP-Adapter se character reference render hota hai
+  - `--parallel N`: `comfy_urls` me N ComfyUI instances (alag GPU) pe scenes
+    parallel render — 48GB+ multi-GPU ka asli faida
 - **QC:** continuity — same lighting, same costume, same face
 
 ## Stage 5 — Voiceover / Dialogue

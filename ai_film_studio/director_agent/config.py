@@ -15,6 +15,14 @@ DEFAULTS = {
     "video_workflow": "wan22_5b_i2v_example.json",     # default scene engine
     "image_workflow": "sdxl_txt2img_api.json",          # keyframe engine
     "image_checkpoint": "sd_xl_base_1.0.safetensors",
+    "keyframe_engine": "sdxl",          # sdxl | ipadapter | qwen_image
+    "keyframe_identity": False,         # True = character reference images + IP-Adapter
+    "ipadapter_preset": "PLUS FACE (portraits)",
+    "ipadapter_clip": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+    "qwen_unet": "qwen_image.safetensors",
+    "qwen_clip": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+    "qwen_vae": "qwen_image_vae.safetensors",
+    "comfy_urls": [],                    # multi-GPU: ["http://127.0.0.1:8188", "http://127.0.0.1:8189"]
     "project_root": PROJECTS_DEFAULT,
     "scene_width": 832,
     "scene_height": 480,

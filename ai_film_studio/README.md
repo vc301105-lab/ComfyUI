@@ -124,18 +124,30 @@ cp config.json.example config.json        # apne paths/models set karein
 # 1) Idea -> Hinglish script + storyboard (Ollama chahiye; --mock se bina Ollama demo)
 python3 director.py plan --idea "Ek chai ki tapri ka sapna" --scenes 8 [--mock]
 
-# 2) Preview (koi network call nahi)
-python3 director.py render --dry-run
+# 2) Cast: har character ka reference image (consistency ke liye)
+python3 director.py cast [--dry-run]
 
-# 3) Real render (ComfyUI chal raha ho + models downloaded)
-python3 director.py render [--scene 1,2,3] [--workflow wan22_5b_i2v_example.json]
+# 3) Preview (koi network call nahi)
+python3 director.py render --dry-run --parallel 2 --identity
 
-# 4) Final film
+# 4) Real render: --identity = IP-Adapter character consistency,
+#    --parallel 2 = do ComfyUI instances pe scenes parallel (multi-GPU)
+python3 director.py render [--scene 1,2,3] [--workflow wan22_5b_i2v_example.json] \
+                           [--identity] [--parallel 2]
+
+# 5) Final film
 python3 director.py assemble [--with-audio] [--subtitles]
 
-# 5) Progress
+# 6) Progress
 python3 director.py status
 ```
+
+**Keyframe engines** (`keyframe_engine` in config): `sdxl` (default) |
+`ipadapter` (character ref + IP-Adapter, config me `keyframe_identity: true`)
+| `qwen_image` (Apache, in-image text ke liye).
+
+**Multi-GPU:** config me `comfy_urls: ["http://127.0.0.1:8188", "http://127.0.0.1:8189"]`
+— phir `render --parallel 2` scenes dono GPU pe distribute karta hai.
 
 State har scene ka `meta/state.json` me save hota hai — **resumable**: koi scene
 fail ho toh sirf wahi scene dobara render hota hai.
