@@ -33,9 +33,27 @@ DEFAULTS = {
         "extra fingers, mutated, deformed, bad anatomy"
     ),
     "tts": {
-        "engine": "none",       # none | chatterbox | kokoro | custom
-        "command": "",           # custom: jiase  "python -m chatterbox --text %TEXT% --output_path %OUT%"
+        "engine": "none",       # none | chatterbox | custom
+        "command": "",           # custom: jiase  "chatterbox --text %TEXT% --output_path %OUT%"
+        "model": "",
+        "sample_rate": 48000,
+        "pause": 0.4,
     },
+    "lipsync": {
+        "engine": "none",       # none | latentsync | wav2lip | custom
+        "command": "",           # %VIDEO% %AUDIO% %OUT%
+    },
+    "music": {
+        "engine": "none",       # none | acestep | custom
+        "command": "",           # %PROMPT% %DURATION% %OUT%
+        "prompt": "cinematic emotional indian score",
+        "volume": 0.18,
+    },
+    "subs": {
+        "model": "small",        # faster-whisper model
+        "language": "hi",        # hi / en / "auto"
+    },
+    "post": {"loudness": -14.0},
     "subtitles": False,
 }
 

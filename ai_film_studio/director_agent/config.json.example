@@ -22,7 +22,27 @@
   "negative_prompt": "low quality, worst quality, blurry, distorted, watermark, text, extra fingers, mutated, deformed, bad anatomy",
   "tts": {
     "engine": "none",
+    "command": "",
+    "model": "",
+    "sample_rate": 48000,
+    "pause": 0.4
+  },
+  "lipsync": {
+    "engine": "none",
     "command": ""
+  },
+  "music": {
+    "engine": "none",
+    "command": "",
+    "prompt": "cinematic emotional indian score",
+    "volume": 0.18
+  },
+  "subs": {
+    "model": "small",
+    "language": "hi"
+  },
+  "post": {
+    "loudness": -14.0
   },
   "subtitles": false
 }

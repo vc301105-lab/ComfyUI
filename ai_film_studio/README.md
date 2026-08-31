@@ -135,8 +135,12 @@ python3 director.py render --dry-run --parallel 2 --identity
 python3 director.py render [--scene 1,2,3] [--workflow wan22_5b_i2v_example.json] \
                            [--identity] [--parallel 2]
 
-# 5) Final film
-python3 director.py assemble [--with-audio] [--subtitles]
+# 5) Final film (simple concat)
+python3 director.py assemble
+
+# 5b) FULL post-production: voice + lip-sync + music + subtitles + loudness
+python3 director.py post --tts chatterbox --lipsync latentsync \
+                         --music acestep --subtitles --language hi
 
 # 6) Progress
 python3 director.py status
@@ -148,6 +152,25 @@ python3 director.py status
 
 **Multi-GPU:** config me `comfy_urls: ["http://127.0.0.1:8188", "http://127.0.0.1:8189"]`
 — phir `render --parallel 2` scenes dono GPU pe distribute karta hai.
+
+### 🎙️ Post-production engines (config me commands set karein)
+
+| Engine | config key | command template |
+|---|---|---|
+| Chatterbox TTS | `tts.command` | `chatterbox --text "%TEXT%" --output_path "%OUT%"` |
+| LatentSync | `lipsync.command` | `python scripts/inference.py --video_path "%VIDEO%" --audio_path "%AUDIO%" --output_path "%OUT%"` |
+| Wav2Lip | `lipsync.command` | `python inference.py --checkpoint_path ckpt.pth --face "%VIDEO%" --audio "%AUDIO%" --outfile "%OUT%"` |
+| ACE-Step | `music.command` | `python cli.py --prompt "%PROMPT%" --duration %DURATION% --output "%OUT%"` |
+| Subtitles | — | `pip install faster-whisper` (auto `hi`/`en` transcription) |
+
+### 🧪 Tests (GPU ke bina — sandbox me verified)
+```bash
+cd ai_film_studio/director_agent
+python3 tests/test_post.py          # SRT + command templates
+python3 tests/test_converter.py     # 5 workflows UI->API conversion
+python3 tests/test_templates.py     # SDXL/IP-Adapter/Qwen templates
+python3 tests/test_e2e.py           # mock ComfyUI se plan->render->assemble (multi-GPU)
+```
 
 State har scene ka `meta/state.json` me save hota hai — **resumable**: koi scene
 fail ho toh sirf wahi scene dobara render hota hai.

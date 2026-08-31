@@ -95,6 +95,17 @@ def cmd_assemble(args, cfg):
     print(f"DONE -> {video}")
 
 
+def cmd_post(args, cfg):
+    project = project_dir(cfg, args.project)
+    out = assembler.finish(
+        cfg, project,
+        tts_engine=args.tts, lipsync_engine=args.lipsync,
+        music_engine=args.music, subtitles=args.subtitles,
+        loudness=None if args.no_loudness else cfg.get("post", {}).get("loudness", -14.0),
+        language=args.language)
+    print(f"POPCORN TIME 🍿 -> {out}")
+
+
 def cmd_status(args, cfg):
     project = project_dir(cfg, args.project)
     plan = load_plan(project)
@@ -142,13 +153,23 @@ def main():
     sp.add_argument("--with-audio", action="store_true")
     sp.add_argument("--subtitles", action="store_true")
 
+    sp = sub.add_parser("post", help="Post-production: voice + lip-sync + music + subs -> master")
+    sp.add_argument("--project", default="myfilm")
+    sp.add_argument("--tts", default=None, choices=["none", "chatterbox", "custom"])
+    sp.add_argument("--lipsync", default=None,
+                    choices=["none", "latentsync", "wav2lip", "custom"])
+    sp.add_argument("--music", default=None, choices=["none", "acestep", "custom"])
+    sp.add_argument("--subtitles", action="store_true")
+    sp.add_argument("--language", default=None)
+    sp.add_argument("--no-loudness", action="store_true")
+
     sp = sub.add_parser("status", help="Project render progress")
     sp.add_argument("--project", default="myfilm")
 
     args = p.parse_args()
     cfg = config_mod.load_config(args.config)
     {"plan": cmd_plan, "cast": cmd_cast, "render": cmd_render,
-     "assemble": cmd_assemble, "status": cmd_status}[args.cmd](args, cfg)
+     "assemble": cmd_assemble, "post": cmd_post, "status": cmd_status}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":
