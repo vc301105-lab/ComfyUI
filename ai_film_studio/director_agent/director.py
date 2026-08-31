@@ -153,6 +153,44 @@ def cmd_dub(args, cfg):
     print(f"DUB DONE -> {out}")
 
 
+def cmd_make(args, cfg):
+    import pipeline  # noqa: E402
+    if args.dry_run:
+        cfg["project_name"] = args.project
+    else:
+        cfg["project_name"] = args.project if args.project != "myfilm" else None
+    project, final = pipeline.run_make(
+        cfg, args.idea, scene_count=args.scenes, mock=args.mock,
+        parallel=args.parallel, identity=args.identity,
+        tts=args.tts, lipsync=args.lipsync, music=args.music,
+        subtitles=args.subtitles, language=args.language,
+        auto_fix=not args.no_autofix, max_fix=args.max_fix,
+        dry_run=args.dry_run, llm_model=args.llm_model)
+    if final:
+        print(f"READY 🍿 -> {final}")
+
+
+def cmd_export(args, cfg):
+    import export  # noqa: E402
+    project = project_dir(cfg, args.project)
+    kind = args.kind
+    if kind == "trailer":
+        ids = None
+        if args.scene:
+            ids = [int(x) for x in args.scene.split(",")]
+        out = export.make_trailer(project, scene_ids=ids, n=args.n)
+    elif kind == "poster":
+        sid = int(args.scene) if args.scene else None
+        out = export.make_poster(project, scene_id=sid)
+    elif kind == "credits":
+        out = export.make_credits(project, seconds=args.seconds)
+    elif kind == "preset":
+        out = export.platform_preset(project, preset=args.preset)
+    else:
+        raise SystemExit(f"unknown kind: {kind}")
+    print(f"[export] {kind} -> {out}" if out else "[export] FAILED (upar dekhein)")
+
+
 def cmd_status(args, cfg):
     project = project_dir(cfg, args.project)
     plan = load_plan(project)
@@ -210,6 +248,34 @@ def main():
     sp.add_argument("--language", default=None)
     sp.add_argument("--no-loudness", action="store_true")
 
+    sp = sub.add_parser("make", help="ONE-SHOT: plan->cast->render->post->qc->auto-fix")
+    sp.add_argument("--project", default="myfilm")
+    sp.add_argument("--idea", default="Ek chhoti chai ki tapri ke malik ka sapna")
+    sp.add_argument("--scenes", type=int, default=8)
+    sp.add_argument("--llm-model", default=None)
+    sp.add_argument("--mock", action="store_true")
+    sp.add_argument("--parallel", type=int, default=1)
+    sp.add_argument("--identity", action="store_true")
+    sp.add_argument("--tts", default=None, choices=["none", "chatterbox", "custom"])
+    sp.add_argument("--lipsync", default=None,
+                    choices=["none", "latentsync", "wav2lip", "custom"])
+    sp.add_argument("--music", default=None, choices=["none", "acestep", "custom"])
+    sp.add_argument("--subtitles", action="store_true")
+    sp.add_argument("--language", default=None)
+    sp.add_argument("--no-autofix", action="store_true")
+    sp.add_argument("--max-fix", type=int, default=2)
+    sp.add_argument("--dry-run", action="store_true")
+
+    sp = sub.add_parser("export", help="Trailer / poster / credits / platform preset")
+    sp.add_argument("--project", default="myfilm")
+    sp.add_argument("--kind", choices=["trailer", "poster", "credits", "preset"],
+                    default="trailer")
+    sp.add_argument("--scene", default=None)
+    sp.add_argument("--n", type=int, default=5)
+    sp.add_argument("--seconds", type=int, default=6)
+    sp.add_argument("--preset", default="youtube",
+                    choices=["youtube", "shorts", "reels", "square"])
+
     sp = sub.add_parser("qc", help="QC/review: scene checks + continuity report")
     sp.add_argument("--project", default="myfilm")
     sp.add_argument("--json-out", default=None)
@@ -228,7 +294,8 @@ def main():
     cfg = config_mod.load_config(args.config)
     {"plan": cmd_plan, "cast": cmd_cast, "render": cmd_render,
      "assemble": cmd_assemble, "post": cmd_post, "qc": cmd_qc,
-     "dub": cmd_dub, "status": cmd_status}[args.cmd](args, cfg)
+     "dub": cmd_dub, "make": cmd_make, "export": cmd_export,
+     "status": cmd_status}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

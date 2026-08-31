@@ -29,6 +29,7 @@ echo "[blackdetect] black_start:0.5 black_end:1.5 black_duration:1.0" >&2
 echo "pts_time:2.0" >&2
 echo "psnr:average:28.5" >&2
 out="${@: -1}"
+if [ "$out" = "-" ]; then exit 0; fi
 src=""
 prev=""
 for a in "$@"; do

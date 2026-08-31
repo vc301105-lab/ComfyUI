@@ -134,10 +134,13 @@ def finish(cfg, project, tts_engine=None, lipsync_engine=None,
 
     # ---- loudness master ----
     if loudness is not None:
-        tmp = out.replace(".mp4", "_master.mp4")
-        media.loudness_normalize(out, tmp, target=float(loudness))
-        out = tmp
-        print(f"[master] -> {out}")
+        if media.has_audio(out):
+            tmp = out.replace(".mp4", "_master.mp4")
+            media.loudness_normalize(out, tmp, target=float(loudness))
+            out = tmp
+            print(f"[master] -> {out}")
+        else:
+            print("[master] no audio stream — loudnorm skip")
 
     print("POST-PRODUCTION DONE ->", out)
     return out

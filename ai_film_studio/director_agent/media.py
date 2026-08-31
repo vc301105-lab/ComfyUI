@@ -55,6 +55,18 @@ def duck_mix(video, music, dst, music_volume=0.18):
     return dst
 
 
+def has_audio(path):
+    """True if video me audio stream hai (ffprobe fail -> False)."""
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-print_format", "json",
+         "-show_streams", path], capture_output=True, text=True)
+    try:
+        d = json.loads(r.stdout or "{}")
+        return any(s.get("codec_type") == "audio" for s in d.get("streams", []))
+    except Exception:
+        return False
+
+
 def loudness_normalize(video, dst, target=-14.0):
     run(["ffmpeg", "-y", "-i", video,
          "-af", f"loudnorm=I={target}:TP=-1.5:LRA=11",

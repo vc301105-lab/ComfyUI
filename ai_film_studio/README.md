@@ -173,6 +173,24 @@ python3 director.py status
 | ACE-Step | `music.command` | `python cli.py --prompt "%PROMPT%" --duration %DURATION% --output "%OUT%"` |
 | Subtitles | — | `pip install faster-whisper` (auto `hi`/`en` transcription) |
 
+### ⚡ One-shot production (auto QC fix loop)
+```bash
+python3 director.py make --idea "Ek chai ki tapri ka sapna" --scenes 12 \
+                         --parallel 2 --identity --tts chatterbox \
+                         --lipsync latentsync --music acestep --subtitles
+# -> plan -> cast -> render -> post -> qc -> bad scenes AUTO re-render (max 2)
+# -> meta/make_report.json + final_master.mp4
+```
+
+### 📦 Export pack
+```bash
+python3 director.py export --kind trailer --n 5        # top-QC scenes ka trailer
+python3 director.py export --kind poster --scene 1     # 2:3 poster (keyframe se)
+python3 director.py export --kind credits              # title + logline card
+python3 director.py export --kind preset --preset youtube  # 1920x1080
+python3 director.py export --kind preset --preset shorts   # 1080x1920 (Reels)
+```
+
 ### 🧪 Tests (GPU ke bina — sandbox me verified)
 ```bash
 cd ai_film_studio/director_agent
@@ -181,6 +199,7 @@ python3 tests/test_converter.py     # 5 workflows UI->API conversion
 python3 tests/test_templates.py     # SDXL/IP-Adapter/Qwen templates
 python3 tests/test_qc_dub.py        # QC checks (black/cuts/PSNR) + dub translate
 python3 tests/test_e2e.py           # mock ComfyUI se plan->render->assemble (multi-GPU)
+python3 tests/test_make_export.py   # one-shot make (auto-fix) + trailer/poster/credits/presets
 ```
 
 ### 📥 Model downloader (`setup/04_download_models.py`)
